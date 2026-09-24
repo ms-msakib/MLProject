@@ -166,4 +166,146 @@ LOG_FILE_PATH = os.path.join(logs_path, LOG_FILE)
 
 ---
 
+## Step 6 — Run the custom exception module
+
+**Command:**
+```powershell
+python src/exception.py
+```
+
+**Status:** ❌ Failed → ✅ Fixed (syntax error; a second latent error found and fixed)
+
+**Error:**
+```
+File "...\src\exception.py", line 11
+    return error_message
+    ^^^^^^^^^^^^^^^^^^^^
+SyntaxError: 'return' outside function
+```
+
+### 1. What the error says and about which command
+Python refused to even start `src/exception.py`: the `return error_message` line at the end of `error_message_detail()` was not indented, so it sat at module level, where `return` is illegal.
+
+### 2. Resolution & prevention
+**Root cause found:** Missing 4-space indentation on `return error_message`, so it fell outside the function body.
+
+**Resolution:** Indented it to sit inside `error_message_detail()`.
+
+**Second issue caught while fixing (would have hit next):** the `__main__` block calls `logging.info(...)` but `logging` was never imported → `NameError`. Added `import logging`. Note: this plain import is not configured, so that message is not written to the log file. To write to the log file, import the configured logger instead (e.g. once the project is run as a package: `from src.logger import logging`, run with `python -m src.exception` from the project root).
+
+**How to avoid this in future:**
+- A `SyntaxError: 'return' outside function` almost always means indentation; check that the line is indented under its `def`.
+- Use an editor with indentation guides / auto-format so misaligned blocks are visible.
+- Re-read the whole file for undefined names (missing imports) after fixing a syntax error, since Python only reports one error at a time.
+
+---
+
+## Step 7 — Re-run the custom exception module (verification)
+
+**Command:**
+```powershell
+python src/exception.py
+```
+
+**Status:** ✅ Working as intended (this is the expected output, not a bug)
+
+**Output:**
+```
+ZeroDivisionError: division by zero
+
+During handling of the above exception, another exception occurred:
+
+CustomException: Error occured in python script name[...\src\exception.py] line number [26] error message[division by zero]
+```
+
+### 1. What the output means
+The `__main__` block deliberately runs `1/0` to test the exception class. The `ZeroDivisionError` is caught and re-raised as `CustomException`, whose message shows the script name, the line number (26, where `1/0` happened) and the original error text. The "During handling of the above exception..." wording is Python's normal chaining of the two exceptions.
+
+### 2. Notes
+- Nothing to fix. `CustomException` correctly reports the file, line and message.
+- The `logging.info("Divide by zero error")` call uses the plain, unconfigured `logging` module, so it is not written to the log file (see Step 6 for how to route it to `src/logger.py`).
+
+---
+
+## Step 8 — Route exception logging to the configured logger
+
+**Change:** In `src/exception.py`, replaced `import logging` with `from src.logger import logging`, so `logging.info(...)` writes to the timestamped file in `logs/`.
+
+**Command (run from the project root):**
+```powershell
+python -m src.exception
+```
+
+**Note:** `python src/exception.py` no longer works, because `src` is not on the import path when the file is run directly (`ModuleNotFoundError: No module named 'src'`). Use `python -m src.exception` from the project root instead.
+
+---
+
+## Step 9 — Fix "ipykernel is required" popup in the EDA notebook
+
+**Problem:** Running the first cell of `notebook/1 . EDA STUDENT PERFORMANCE .ipynb` showed a popup saying `ipykernel` is required. The selected kernel was the project's `venv` (Python 3.8.0), which did not have `ipykernel` installed.
+
+**Command (run from the project root):**
+```powershell
+.\venv\python.exe -m pip install ipykernel
+```
+
+**Status:** ✅ Installed `ipykernel 6.29.5` (plus dependencies such as `ipython 8.12.3`, `jupyter-client 8.6.3`, `debugpy`, `pyzmq`, `tornado`).
+
+### 1. What it means
+The `venv` folder is laid out like a conda environment: `python.exe` is in the folder root, and there is a `conda-meta` folder. There is no `venv/Scripts/python.exe`, so the interpreter path is `venv\python.exe`. VS Code needs `ipykernel` in the selected interpreter to start a notebook kernel.
+
+### 2. Resolution & prevention
+- Reload the VS Code window (`Ctrl+Shift+P` → "Developer: Reload Window").
+- Click **Select Kernel** → **Python Environments…** → pick the venv (Python 3.8.0), then re-run the cell.
+- The pip warnings about scripts not being on PATH are harmless.
+- Add `ipykernel` to `requirement.txt` if the notebook should work on a fresh setup.
+
+---
+
+## Step 10 — `ModuleNotFoundError: No module named 'numpy'` on `import numpy as np`
+
+**Problem:** After fixing the kernel (Step 9), running the first cell of `notebook/1 . EDA STUDENT PERFORMANCE .ipynb` (`import numpy as np`) failed because `numpy` was not installed in the `venv` interpreter.
+
+**Command (run from the project root):**
+```powershell
+.\venv\python.exe -m pip install pandas numpy seaborn matplotlib
+```
+
+**Status:** ✅ Installed `numpy 1.24.4`, `pandas 2.0.3`, `seaborn 0.13.2`, `matplotlib 3.7.5` (plus dependencies: `contourpy`, `cycler`, `fonttools`, `kiwisolver`, `pillow`, `pyparsing`, `pytz`, `tzdata`, `importlib-resources`).
+
+### 1. What it means
+`requirement.txt` lists `pandas`, `numpy`, `seaborn`, `matplotlib`, `-e .`, but they had never been installed into this `venv` — only `ipykernel` (Step 9) was present. The venv was effectively empty of the project's data-science dependencies.
+
+### 2. Resolution & prevention
+- Verified with `venv\python.exe -c "import numpy, pandas, seaborn, matplotlib"` — imports succeed.
+- To install everything in `requirement.txt` (including the local package via `-e .`) in one go instead of picking packages by hand:
+  ```powershell
+  .\venv\python.exe -m pip install -r requirement.txt
+  ```
+- Re-run the notebook cells after this; the kernel must still be set to the `venv` (Python 3.8.0) interpreter.
+
+---
+
+## Step 11 — `ModuleNotFoundError: No module named 'sklearn'` in MODEL TRAINING.ipynb
+
+**Problem:** Running the first cell of `notebook/2. MODEL TRAINING.ipynb` failed on `from sklearn.metrics import mean_squared_error, r2_score`. The same cell also imports `catboost` and `xgboost`, neither of which is listed in `requirement.txt` (only `pandas`, `numpy`, `seaborn`, `matplotlib`, `-e .` are).
+
+**Command (run from the project root):**
+```powershell
+.\venv\python.exe -m pip install --default-timeout=300 scikit-learn catboost xgboost
+```
+
+**Status:** ✅ Installed `scikit-learn 1.3.2`, `catboost 1.2.10`, `xgboost 2.1.4`.
+
+### 1. What it means
+`requirement.txt` never listed `scikit-learn`, `catboost`, or `xgboost`, so they had never been installed in this `venv`. A first plain `pip install scikit-learn catboost xgboost` attempt failed with `ReadTimeoutError: HTTPSConnectionPool(host='files.pythonhosted.org', port=443): Read timed out.` — `catboost`'s wheel is large (~100+ MB) and pip's default download timeout (15s) was too short for the connection speed at the time.
+
+### 2. Resolution & prevention
+- Retried with `--default-timeout=300` (5 minutes), which succeeded.
+- Verified with `venv\python.exe -c "import sklearn, catboost, xgboost"` — imports succeed.
+- `requirement.txt` should be updated to include `scikit-learn`, `catboost`, and `xgboost` so a fresh `pip install -r requirement.txt` sets up everything this project's notebooks need.
+- If a future install times out again, retry with `--default-timeout=<seconds>` rather than assuming the package is broken.
+
+---
+
 <!-- Add new steps below in the same format: Command → Status → Error (if any) → (1) What it means (2) Resolution & prevention -->
