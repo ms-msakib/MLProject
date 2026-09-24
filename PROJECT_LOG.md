@@ -132,4 +132,38 @@ fatal: unable to access 'https://github.com/ms-msakib/MLProject.git/': The reque
 
 ---
 
+## Step 5 — Run the logger module
+
+**Command:**
+```powershell
+python src/logger.py
+```
+
+**Status:** ❌ Failed → ✅ Fixed
+
+**Error:**
+```
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Projects\\ML Project\\Section 48 ML Project end to end\\logs\\09-24-2026_13-31-28.log\\09-24-2026_13-31-28.log'
+```
+
+### 1. What the error says and about which command
+`logging.basicConfig(filename=LOG_FILE_PATH, ...)` in `src/logger.py` tried to open a log file, but the path was `logs\<timestamp>.log\<timestamp>.log`, i.e. the log file name appeared twice, and the parent "directory" `<timestamp>.log` did not exist.
+
+### 2. Resolution & prevention
+**Root cause found:** `logs_path` was built as `os.path.join(os.getcwd(), "logs", LOG_FILE)` (already includes the file name), then `LOG_FILE_PATH = os.path.join(logs_path, LOG_FILE)` appended the file name again. `os.makedirs(os.path.dirname(logs_path))` only created `logs\`, not the `<timestamp>.log` folder the final path required.
+
+**Resolution:** Make `logs_path` the directory only and create it:
+```python
+logs_path = os.path.join(os.getcwd(), "logs")
+os.makedirs(logs_path, exist_ok=True)
+LOG_FILE_PATH = os.path.join(logs_path, LOG_FILE)
+```
+
+**How to avoid this in future:**
+- Keep "directory" and "file path" variables separate; only join the file name once.
+- `os.makedirs` should be called on the directory itself, not on a path that includes the file name.
+- Note: the log goes under `os.getcwd()`, so `logs/` is created wherever the script is run from (run from the project root for consistency).
+
+---
+
 <!-- Add new steps below in the same format: Command → Status → Error (if any) → (1) What it means (2) Resolution & prevention -->
