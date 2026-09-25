@@ -496,4 +496,41 @@ Miniconda base has scikit-learn 1.9.1, which no longer accepts `'friedman_mse'` 
 
 ---
 
+## Step 16 — Flask web app (`app.py`) does nothing when run
+
+**Command:**
+```powershell
+python app.py
+```
+
+**Status:** ❌ Failed → ✅ Fixed (server never started, plus three bugs in the prediction route)
+
+**Error:**
+```
+(no output — the command returned to the prompt immediately and no server started)
+```
+
+### 1. What the error says and about which command
+There was no error message. `python app.py` ran the file top to bottom and exited. The `if __name__=="__main__":` block was indented inside the `predict_datapoint()` function, so it only ran as part of that function, which is never called when the file runs. `app.run(...)` was never reached, so Flask never started.
+
+### 2. Resolution & prevention
+**Fixes:**
+
+| File / line | Was | Now | Why it would fail |
+|---|---|---|---|
+| `app.py` end of file | `if __name__=="__main__":` indented inside `predict_datapoint()` | Moved to column 0 (module level) | The server never started (the reported problem) |
+| `app.py` `app.run(...)` | `debug=true` | `debug=True` | Python booleans are capitalised → `NameError: name 'true' is not defined` (would hit next) |
+| `app.py` `predict_datapoint()` | `predict_pipeline=predict_pipeline()` | `predict_pipeline=PredictPipeline()` | Calls the lowercase variable before it exists → `UnboundLocalError` on every form submit |
+| `app.py` + `src/pipeline/predict_pipeline.py` `CustomData` | took `math_score=float(request.form.get('math_score'))` | `math_score` removed | `math_score` is the **target** the model predicts, so the form has no such field → `float(None)` → `TypeError`. The preprocessor also only expects `writing_score` and `reading_score` as numeric inputs |
+
+**Result:** ✅ `python app.py` starts the server on `http://127.0.0.1:5000`. `GET /` returns 200, and submitting the form at `/predictdata` (female, group B, bachelor's degree, standard, none, reading 72, writing 74) returns `THE prediction is 66.11`.
+
+**How to avoid this in future:**
+- `if __name__=="__main__":` must always start at column 0. If a script "runs but does nothing", check its indentation first.
+- Python uses `True`/`False`/`None`, not `true`/`false`/`null`.
+- Classes are `CamelCase` (`PredictPipeline`) and instances are `snake_case` (`predict_pipeline`). Don't give a variable the same name you are calling.
+- The inputs to the prediction pipeline must match the columns the preprocessor was trained on. Never pass the target column (`math_score`) as an input.
+
+---
+
 <!-- Add new steps below in the same format: Command → Status → Error (if any) → (1) What it means (2) Resolution & prevention -->

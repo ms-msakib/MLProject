@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Performance Predictor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #0f172a;
+            --muted: #64748b;
+            --line: #e2e8f0;
+            --field: #f8fafc;
+            --brand: #6366f1;
+            --brand-2: #8b5cf6;
+            --accent: #22d3ee;
+            --good: #10b981;
+            --warn: #f59e0b;
+            --bad: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            color: var(--ink);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 16px;
+            background:
+                radial-gradient(1200px 600px at 10% -10%, #c7d2fe 0%, transparent 60%),
+                radial-gradient(900px 500px at 110% 110%, #cffafe 0%, transparent 55%),
+                #eef2ff;
+        }
+
+        .shell {
+            width: 100%;
+            max-width: 1120px;
+            display: grid;
+            grid-template-columns: 5fr 7fr;
+            background: #fff;
+            border-radius: 28px;
+            overflow: hidden;
+            box-shadow: 0 30px 80px -20px rgba(49, 46, 129, .35), 0 0 0 1px rgba(99, 102, 241, .08);
+        }
+
+        /* ---------- Left: hero panel ---------- */
+        .hero {
+            position: relative;
+            padding: 48px 44px;
+            color: #e0e7ff;
+            background: linear-gradient(155deg, #1e1b4b 0%, #312e81 45%, #4c1d95 100%);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .hero::before, .hero::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(10px);
+            opacity: .55;
+        }
+        .hero::before {
+            width: 320px; height: 320px; right: -120px; top: -100px;
+            background: radial-gradient(circle, #818cf8 0%, transparent 70%);
+        }
+        .hero::after {
+            width: 280px; height: 280px; left: -100px; bottom: -120px;
+            background: radial-gradient(circle, #22d3ee 0%, transparent 70%);
+            opacity: .35;
+        }
+        .hero > * { position: relative; z-index: 1; }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            align-self: flex-start;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            color: #c7d2fe;
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .14);
+        }
+        .badge .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 0 4px rgba(34, 211, 238, .25);
+        }
+
+        .hero h1 {
+            margin-top: 22px;
+            font-size: 38px;
+            line-height: 1.12;
+            font-weight: 800;
+            color: #fff;
+            letter-spacing: -.02em;
+        }
+        .hero h1 span {
+            background: linear-gradient(90deg, #a5b4fc, #67e8f9);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .hero p.lead {
+            margin-top: 16px;
+            font-size: 15px;
+            line-height: 1.65;
+            color: #c7d2fe;
+        }
+
+        .stats {
+            margin-top: 32px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+        .stat {
+            padding: 16px 14px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, .07);
+            border: 1px solid rgba(255, 255, 255, .12);
+            backdrop-filter: blur(6px);
+        }
+        .stat .num {
+            font-size: 22px;
+            font-weight: 800;
+            color: #fff;
+        }
+        .stat .lbl {
+            margin-top: 4px;
+            font-size: 11.5px;
+            color: #a5b4fc;
+            line-height: 1.35;
+        }
+
+        .pipeline {
+            margin-top: 32px;
+        }
+        .pipeline h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: #a5b4fc;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+        .steps {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .steps li {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            color: #e0e7ff;
+        }
+        .steps li .n {
+            flex: none;
+            width: 26px; height: 26px;
+            border-radius: 8px;
+            display: grid;
+            place-items: center;
+            font-size: 12px;
+            font-weight: 700;
+            color: #1e1b4b;
+            background: linear-gradient(135deg, #a5b4fc, #67e8f9);
+        }
+
+        .stack {
+            margin-top: auto;
+            padding-top: 32px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .chip {
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #e0e7ff;
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .14);
+        }
+
+        /* ---------- Right: form panel ---------- */
+        .panel {
+            padding: 48px 48px 40px;
+        }
+        .panel-head h2 {
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -.01em;
+        }
+        .panel-head p {
+            margin-top: 6px;
+            font-size: 14px;
+            color: var(--muted);
+        }
+
+        form {
+            margin-top: 28px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 18px 20px;
+        }
+        .field { display: flex; flex-direction: column; gap: 8px; }
+        .field.full { grid-column: 1 / -1; }
+
+        label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        select, input[type="number"] {
+            width: 100%;
+            font: inherit;
+            font-size: 14.5px;
+            color: var(--ink);
+            padding: 13px 14px;
+            border-radius: 12px;
+            border: 1.5px solid var(--line);
+            background-color: var(--field);
+            outline: none;
+            transition: border-color .15s, box-shadow .15s, background-color .15s;
+        }
+        select {
+            appearance: none;
+            -webkit-appearance: none;
+            padding-right: 40px;
+            cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%2364748b' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+        }
+        select:invalid { color: #94a3b8; }
+        select option { color: var(--ink); }
+        select:focus, input[type="number"]:focus {
+            border-color: var(--brand);
+            background-color: #fff;
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, .15);
+        }
+
+        .score-wrap { position: relative; }
+        .score-wrap .suffix {
+            position: absolute;
+            right: 14px; top: 50%;
+            transform: translateY(-50%);
+            font-size: 13px;
+            color: #94a3b8;
+            pointer-events: none;
+        }
+        .score-wrap input { padding-right: 56px; }
+
+        button {
+            grid-column: 1 / -1;
+            margin-top: 6px;
+            font: inherit;
+            font-size: 15.5px;
+            font-weight: 700;
+            color: #fff;
+            padding: 16px;
+            border: none;
+            border-radius: 14px;
+            cursor: pointer;
+            background: linear-gradient(90deg, var(--brand), var(--brand-2));
+            box-shadow: 0 12px 24px -10px rgba(99, 102, 241, .7);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: transform .15s, box-shadow .15s;
+        }
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 16px 30px -10px rgba(99, 102, 241, .8);
+        }
+
+        /* ---------- Result ---------- */
+        .result {
+            margin-top: 26px;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            padding: 20px 24px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #eef2ff, #ecfeff);
+            border: 1px solid #e0e7ff;
+        }
+        .ring { flex: none; position: relative; width: 108px; height: 108px; }
+        .ring svg { transform: rotate(-90deg); }
+        .ring .val {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            text-align: center;
+        }
+        .ring .val b {
+            display: block;
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1;
+        }
+        .ring .val small {
+            font-size: 11px;
+            color: var(--muted);
+        }
+        .result .eyebrow {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--brand);
+        }
+        .result h3 {
+            margin-top: 4px;
+            font-size: 20px;
+            font-weight: 800;
+        }
+        .result p {
+            margin-top: 6px;
+            font-size: 13.5px;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+        .tag {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .tag-good { color: #047857; background: #d1fae5; }
+        .tag-mid  { color: #4338ca; background: #e0e7ff; }
+        .tag-low  { color: #b45309; background: #fef3c7; }
+
+        .foot {
+            margin-top: 22px;
+            font-size: 12px;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        @media (max-width: 900px) {
+            .shell { grid-template-columns: 1fr; }
+            .hero, .panel { padding: 36px 24px; }
+            .hero h1 { font-size: 30px; }
+        }
+        @media (max-width: 560px) {
+            form { grid-template-columns: 1fr; }
+            .stats { grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+            .result { flex-direction: column; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+{% macro opt(field, value, text) -%}
+    <option value="{{ value }}" {% if request.form.get(field) == value %}selected{% endif %}>{{ text }}</option>
+{%- endmacro %}
+{% set has_form = request.method == 'POST' %}
+
+<main class="shell">
+
+    <!-- Left: project story -->
+    <section class="hero">
+        <span class="badge"><span class="dot"></span>End-to-End ML Project</span>
+        <h1>Student Exam <span>Performance</span> Predictor</h1>
+        <p class="lead">
+            A regression model that predicts a student's <strong>maths score</strong> from their
+            background and their reading and writing results. The pipeline covers data ingestion,
+            preprocessing, and hyperparameter-tuned model selection, and is served with Flask.
+        </p>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="num">0.88</div>
+                <div class="lbl">R² score on test set</div>
+            </div>
+            <div class="stat">
+                <div class="num">1,000</div>
+                <div class="lbl">Student records</div>
+            </div>
+            <div class="stat">
+                <div class="num">8</div>
+                <div class="lbl">Models compared</div>
+            </div>
+        </div>
+
+        <div class="pipeline">
+            <h3>Pipeline</h3>
+            <ol class="steps">
+                <li><span class="n">1</span>Data ingestion &amp; train/test split</li>
+                <li><span class="n">2</span>Imputation, one-hot encoding &amp; scaling</li>
+                <li><span class="n">3</span>GridSearchCV across 8 regressors</li>
+                <li><span class="n">4</span>Best model served through a Flask API</li>
+            </ol>
+        </div>
+
+        <div class="stack">
+            <span class="chip">Python</span>
+            <span class="chip">scikit-learn</span>
+            <span class="chip">XGBoost</span>
+            <span class="chip">CatBoost</span>
+            <span class="chip">Pandas</span>
+            <span class="chip">Flask</span>
+        </div>
+    </section>
+
+    <!-- Right: prediction form -->
+    <section class="panel">
+        <div class="panel-head">
+            <h2>Predict a maths score</h2>
+            <p>Enter the student's details below. All fields are required.</p>
+        </div>
+
+        <form action="{{ url_for('predict_datapoint') }}" method="post">
+            <div class="field">
+                <label for="gender">Gender</label>
+                <select id="gender" name="gender" required>
+                    <option value="" disabled {% if not has_form %}selected{% endif %}>Select gender</option>
+                    {{ opt('gender', 'male', 'Male') }}
+                    {{ opt('gender', 'female', 'Female') }}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="ethnicity">Race / Ethnicity</label>
+                <select id="ethnicity" name="ethnicity" required>
+                    <option value="" disabled {% if not has_form %}selected{% endif %}>Select group</option>
+                    {% for g in ['A', 'B', 'C', 'D', 'E'] %}
+                    {{ opt('ethnicity', 'group ' ~ g, 'Group ' ~ g) }}
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="field full">
+                <label for="parental_level_of_education">Parental level of education</label>
+                <select id="parental_level_of_education" name="parental_level_of_education" required>
+                    <option value="" disabled {% if not has_form %}selected{% endif %}>Select education level</option>
+                    {{ opt('parental_level_of_education', "some high school", "Some high school") }}
+                    {{ opt('parental_level_of_education', "high school", "High school") }}
+                    {{ opt('parental_level_of_education', "some college", "Some college") }}
+                    {{ opt('parental_level_of_education', "associate's degree", "Associate's degree") }}
+                    {{ opt('parental_level_of_education', "bachelor's degree", "Bachelor's degree") }}
+                    {{ opt('parental_level_of_education', "master's degree", "Master's degree") }}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="lunch">Lunch type</label>
+                <select id="lunch" name="lunch" required>
+                    <option value="" disabled {% if not has_form %}selected{% endif %}>Select lunch type</option>
+                    {{ opt('lunch', 'standard', 'Standard') }}
+                    {{ opt('lunch', 'free/reduced', 'Free / reduced') }}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="test_preparation_course">Test preparation course</label>
+                <select id="test_preparation_course" name="test_preparation_course" required>
+                    <option value="" disabled {% if not has_form %}selected{% endif %}>Select status</option>
+                    {{ opt('test_preparation_course', 'none', 'None') }}
+                    {{ opt('test_preparation_course', 'completed', 'Completed') }}
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="reading_score">Reading score</label>
+                <div class="score-wrap">
+                    <input id="reading_score" type="number" name="reading_score" placeholder="e.g. 72"
+                           min="0" max="100" required value="{{ request.form.get('reading_score', '') }}">
+                    <span class="suffix">/ 100</span>
+                </div>
+            </div>
+
+            <div class="field">
+                <label for="writing_score">Writing score</label>
+                <div class="score-wrap">
+                    <input id="writing_score" type="number" name="writing_score" placeholder="e.g. 74"
+                           min="0" max="100" required value="{{ request.form.get('writing_score', '') }}">
+                    <span class="suffix">/ 100</span>
+                </div>
+            </div>
+
+            <button type="submit">
+                Predict maths score
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12h14M13 6l6 6-6 6"/>
+                </svg>
+            </button>
+        </form>
+
+        {% if results is defined and results is not none %}
+        {% set score = [[results|float, 0]|max, 100]|min %}
+        {% if score >= 75 %}
+            {% set color = '#10b981' %}{% set band = 'Strong performance' %}{% set lvl = 'good' %}
+        {% elif score >= 50 %}
+            {% set color = '#6366f1' %}{% set band = 'Average performance' %}{% set lvl = 'mid' %}
+        {% else %}
+            {% set color = '#f59e0b' %}{% set band = 'Needs support' %}{% set lvl = 'low' %}
+        {% endif %}
+        {% set circ = 2 * 3.14159 * 46 %}
+        <div class="result">
+            <div class="ring">
+                <svg width="108" height="108" viewBox="0 0 108 108">
+                    <circle cx="54" cy="54" r="46" fill="none" stroke="#e0e7ff" stroke-width="10"/>
+                    <circle cx="54" cy="54" r="46" fill="none" stroke="{{ color }}" stroke-width="10"
+                            stroke-linecap="round"
+                            stroke-dasharray="{{ circ }}"
+                            stroke-dashoffset="{{ circ * (1 - score / 100) }}"/>
+                </svg>
+                <div class="val"><div><b>{{ "%.1f"|format(results|float) }}</b><small>out of 100</small></div></div>
+            </div>
+            <div>
+                <div class="eyebrow">Prediction</div>
+                <h3>Predicted maths score</h3>
+                <p>Based on the student profile and their reading and writing scores entered above.</p>
+                <span class="tag tag-{{ lvl }}">{{ band }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="foot">Built with Python · scikit-learn · Flask</div>
+    </section>
+</main>
+
+</body>
+</html>
