@@ -308,4 +308,145 @@ The `venv` folder is laid out like a conda environment: `python.exe` is in the f
 
 ---
 
+## Step 12 — Run data ingestion + data transformation
+
+**Command (run from the project root):**
+```powershell
+python src/components/data_ingestion.py
+```
+
+**Status:** ❌ Failed → ✅ Fixed (three errors, each found only after the previous one was fixed)
+
+**Error (as first reported):**
+```
+File "...\src\components\data_ingestion.py", line 57, in <module>
+    datatransformation.initiate_data_transformation(train_data,test_data)
+AttributeError: 'DataTransformation' object has no attribute 'initiate_data_transformation'
+```
+
+### 1. What the error says and about which command
+Data ingestion finished (it wrote `train.csv`, `test.csv`, `data.csv`). The script then called `DataTransformation().initiate_data_transformation(...)`, but Python found no method with that name on the `DataTransformation` class.
+
+### 2. Resolution & prevention
+**Root cause found:** In `src/components/data_transformation.py`, `def initiate_data_transformation(self, ...)` started at column 0, not indented under `class DataTransformation:`. Python therefore treated it as a separate module-level function, not a method of the class.
+
+**Resolution:** Indented the whole `initiate_data_transformation` block by 4 spaces so it is inside the class.
+
+**Second error (hit on the next run):**
+```
+ValueError: Cannot specify both 'axis' and 'index'/'columns'
+```
+`train_df.drop(columns=[target_column_name], axis=1)` passes the axis twice: `columns=` already means "drop columns", and pandas does not accept it together with `axis=`. Fix: `train_df.drop(columns=[target_column_name])` (same for `test_df`).
+
+**Third error (hit on the run after that):**
+```
+NameError: name 'pickle' is not defined
+```
+`save_object()` in `src/utils.py` called `pickle.dump(...)`, but the file imports `dill`, not `pickle`. Fix: changed it to `dill.dump(obj, file_obj)`.
+
+**Result:** `python src/components/data_ingestion.py` exits without errors and creates `artifacts/train.csv`, `artifacts/test.csv`, `artifacts/data.csv` and `artifacts/preprocessor.pkl`.
+
+**How to avoid this in future:**
+- An `AttributeError: '<Class>' object has no attribute '<method>'` for a method you did write usually means indentation. Check that the `def` is indented inside the class.
+- Use either `df.drop(columns=[...])` or `df.drop([...], axis=1)`, never both.
+- Check that every module used in a file (`pickle`, `dill`, etc.) is actually imported. Python only reports these errors when the line runs.
+- Note: plain `python` here resolves to the Miniconda base interpreter (`C:\Miniconda3`), not `venv\python.exe`. To use the project's venv, run `.\venv\python.exe -m src.components.data_ingestion` from the project root (see Step 13; running the file path directly with the venv fails with `No module named 'src'`).
+
+---
+
+## Step 13 — Run the full pipeline with the new model trainer
+
+**Command (as run):**
+```powershell
+python src/components/data_ingestion.py
+```
+
+**Status:** ❌ Failed → ✅ Fixed (import error, four bugs in the new model trainer code, then missing packages in the venv)
+
+**Error:**
+```
+File "...\src\components\data_ingestion.py", line 14, in <module>
+    from src.components.model_trainer import ModelTrainerConfig, ModelTrainer
+File "...\src\components\model_trainer.py", line 5, in <module>
+    from dataclass import dataclass
+ModuleNotFoundError: No module named 'dataclass'
+```
+
+### 1. What the error says and about which command
+`data_ingestion.py` now imports `src/components/model_trainer.py`. The first line of that file to fail was `from dataclass import dataclass`. Python has no module called `dataclass`; the standard-library module is `dataclasses` (with an **s**). The script stopped while importing, before any data was read, so that run's log file in `logs/` is empty.
+
+### 2. Resolution & prevention
+**Fixes in `src/components/model_trainer.py`:**
+
+| Line | Was | Now | Why it would fail |
+|---|---|---|---|
+| 5 | `from dataclass import dataclass` | `from dataclasses import dataclass` | Module name is `dataclasses` → `ModuleNotFoundError` |
+| 27 | `path.join("artifacts", "model.pkl")` | `os.path.join(...)` | `path` is not defined → `NameError` |
+| 54 | `evaluate_model(...)` | `evaluate_models(...)` | Function in `src/utils.py` is named `evaluate_models` → `NameError` |
+| 34 | `initiate_model_trainer(self, train_array, test_array, preprocessor_path)` | `initiate_model_trainer(self, train_array, test_array)` | `data_ingestion.py` calls it with 2 arguments and the parameter was unused → `TypeError` |
+| 79 | `r2_score = r2_score(y_test, predicted)` | `r2_square = r2_score(y_test, predicted)` | Assigning to `r2_score` inside the function makes it a local variable, so the call happens before it has a value → `UnboundLocalError` |
+
+**Environment issues found while re-running:**
+- `ModuleNotFoundError: No module named 'catboost'` → plain `python` is the Miniconda base interpreter, which does not have `catboost`. `catboost` was installed into `venv` in Step 11, so run the project with the venv instead.
+- The venv was missing `dill` (used by `save_object` in `src/utils.py`). Installed with `.\venv\python.exe -m pip install dill` (`dill 0.4.0`).
+- `.\venv\python.exe src/components/data_ingestion.py` → `ModuleNotFoundError: No module named 'src'`. Plain `python` found `src` only because the project is installed with `-e .` in Miniconda; the venv does not have that. Running it as a module from the project root fixes this (same approach as Step 8).
+- Added `catboost` to `requirements.txt`, since `model_trainer.py` imports it.
+
+**Command to use from now on (from the project root):**
+```powershell
+.\venv\python.exe -m src.components.data_ingestion
+```
+
+**Result:** ✅ Pipeline ran end to end. Output: `0.8795158595242263` (R² on the test set). Best model: `LinearRegression()`. Created `artifacts/model.pkl` alongside `train.csv`, `test.csv`, `data.csv`, `preprocessor.pkl`.
+
+**Harmless warning in the output:** `UserWarning: Could not find the number of physical cores ... Returning the number of logical cores instead.` (from joblib, used by scikit-learn). It is only a warning, and the run still exits successfully. To silence it: `$env:LOKY_MAX_CPU_COUNT = "4"` before running.
+
+**How to avoid this in future:**
+- Standard-library module names must be exact: `dataclasses`, not `dataclass`.
+- Never reuse an imported function's name as a variable (`r2_score = r2_score(...)`); pick a different name.
+- When calling a helper from another file, check its exact name and parameters (`evaluate_models` in `utils.py`), and keep a method's parameters in step with the places that call it.
+- Always run with the same interpreter the packages were installed into (`.\venv\python.exe`), and add every new import (`catboost`, `dill`, …) to `requirements.txt`.
+- Known remaining issue: `raise CustomException("No best model found")` (line 67) is missing the `sys` argument, so it would itself error if no model scored ≥ 0.6. It does not trigger now (best score 0.88).
+
+---
+
+## Step 14 — `No module named 'catboost'` with plain `python` (Miniconda base)
+
+**Command:**
+```powershell
+python src/components/data_ingestion.py
+```
+
+**Status:** ❌ Failed → ✅ Fixed
+
+**Error:**
+```
+File "...\src\components\model_trainer.py", line 7, in <module>
+    from catboost import CatBoostRegressor
+ModuleNotFoundError: No module named 'catboost'
+```
+
+### 1. What the error says and about which command
+Plain `python` is the Miniconda base interpreter (`C:\Miniconda3\python.exe`, Python 3.14.7), not the project's `venv`. `catboost` was installed only in the `venv` (Step 11), so importing `model_trainer.py` failed under Miniconda base. The code itself was fine: the venv command from Step 13 worked.
+
+### 2. Resolution & prevention
+**Resolution:** Installed `catboost` into Miniconda base:
+```powershell
+python -m pip install --default-timeout=300 catboost
+```
+Installed `catboost 1.2.10` (plus `plotly 7.1.0`, `graphviz 0.21`).
+
+**Result:** ✅ `python src/components/data_ingestion.py` now runs end to end (R² = `0.8804332983749565`).
+
+**Notes:**
+- Both commands now work: `python src/components/data_ingestion.py` (Miniconda base) and `.\venv\python.exe -m src.components.data_ingestion` (venv).
+- The two environments have different package versions (Python 3.14 vs 3.8), so the R² score differs slightly between them (0.8804 vs 0.8795). Pick one environment and use it consistently.
+- CatBoost creates a `catboost_info/` folder in the project root with its training logs. It is safe to ignore, or add it to `.gitignore`.
+
+**How to avoid this in future:**
+- `ModuleNotFoundError` for a package you already installed usually means a different Python is running. Check with `Get-Command python` / `python -c "import sys; print(sys.executable)"`.
+- Install packages with `python -m pip install ...` using the same `python` you run the project with, so they go into that interpreter.
+
+---
+
 <!-- Add new steps below in the same format: Command → Status → Error (if any) → (1) What it means (2) Resolution & prevention -->
