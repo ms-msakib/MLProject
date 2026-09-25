@@ -449,4 +449,51 @@ Installed `catboost 1.2.10` (plus `plotly 7.1.0`, `graphviz 0.21`).
 
 ---
 
+## Step 15 — Hyperparameter tuning (GridSearchCV) added to the model trainer
+
+**Command:**
+```powershell
+python src/components/data_ingestion.py
+```
+
+**Status:** ❌ Failed → ✅ Fixed (one error reported, two more bugs found and fixed, plus one warning cleaned up)
+
+**Error:**
+```
+src.exception.CustomException: Error occured in python script name[...\src\components\model_trainer.py] line number [95]
+error message[Error occured in python script name[...\src\utils.py] line number [31] error message[name 'GridSearchCV' is not defined]]
+```
+
+### 1. What the error says and about which command
+Ingestion and transformation finished; the failure came during model training. `evaluate_models()` in `src/utils.py` (line 31) now calls `GridSearchCV(...)` to tune each model, but `GridSearchCV` was never imported, so Python did not know the name. The error message is nested because `CustomException` from `utils.py` was caught and wrapped again by `model_trainer.py` (line 95, the `evaluate_models(...)` call).
+
+### 2. Resolution & prevention
+**Fixes:**
+
+| File / line | Was | Now | Why it would fail |
+|---|---|---|---|
+| `src/utils.py` imports | *(missing)* | `from sklearn.model_selection import GridSearchCV` | The reported error → `NameError` |
+| `src/utils.py` line 32 | `GridSearchCV(model, para, cv=3)` | `GridSearchCV(model, param, cv=3)` | The variable is named `param`; `para` does not exist → `NameError` (would hit next) |
+| `src/components/model_trainer.py` `models` dict | `"Liner Regression"`, `"K-Neighbour Classifier"`, `"XGBClassifier"`, `"CatBoosting Classifier"`, `"AdaBoost Classifier"` | `"Linear Regression"`, `"K-Neighbour Regressor"`, `"XGBRegressor"`, `"CatBoosting Regressor"`, `"AdaBoost Regressor"` | `evaluate_models` looks up `params[<model name>]`, and these names did not match the keys in the new `params` dict → `KeyError: 'Liner Regression'` (would hit next) |
+
+**Warning cleaned up after the fixes:**
+```
+3 fits failed ... InvalidParameterError: The 'criterion' parameter of DecisionTreeRegressor must be a str among {'absolute_error', 'squared_error', 'poisson'}. Got 'friedman_mse' instead.
+UserWarning: One or more of the test scores are non-finite: [0.69659899 nan 0.6973352 0.71249762]
+```
+Miniconda base has scikit-learn 1.9.1, which no longer accepts `'friedman_mse'` for `DecisionTreeRegressor` (the venv's 1.3.2 still does). The run did not crash, but those grid-search fits were wasted. Removed `'friedman_mse'` from the Decision Tree `criterion` list; it now works in both environments.
+
+**Result:** ✅ Both commands run end to end with no errors or warnings:
+- `python src/components/data_ingestion.py` → R² `0.8804332983749565`
+- `.\venv\python.exe -m src.components.data_ingestion` → R² `0.8795158595242263`
+- Best model is still `LinearRegression()`. Training now takes ~40 s (the grid search tries every parameter combination with 3-fold cross-validation).
+
+**How to avoid this in future:**
+- When you use a new class (`GridSearchCV`, etc.), add its import at the top of the file at the same time.
+- A `NameError` right after a rename usually means one place still uses the old name (`para` vs `param`).
+- When two dicts are matched by key (`models` and `params`), the keys must be spelled exactly the same. Copy them from one dict to the other instead of retyping.
+- Parameter values accepted by scikit-learn change between versions. If a grid search prints "fits failed", read the `InvalidParameterError` and remove the rejected value.
+
+---
+
 <!-- Add new steps below in the same format: Command → Status → Error (if any) → (1) What it means (2) Resolution & prevention -->
